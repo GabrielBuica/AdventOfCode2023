@@ -1,80 +1,88 @@
-let input_file_one = "input1.txt"
-let input_file_two = "input2.txt"
+let input_file = "input.txt"
 let test_input = "test_input.txt"
-
-let number_of_line line =
-  let pair = String.fold_left (fun acc c -> 
-                                    match c with 
-                                    | '0'..'9' -> begin
-                                                  match acc with
-                                                  | (-1, -1) -> (int_of_string (String.make 1 c), int_of_string (String.make 1 c))
-                                                  | (fst, _) -> (fst, int_of_string (String.make 1 c))
-                                                  end
-                                    | _ -> acc) 
-                                  (-1, -1) line in
-    match pair with
-    | (-1, snd) -> snd
-    | (fst, snd) -> fst * 10 + snd
-                          
-let sum_of_lines lines =
-  List.fold_right ( fun line acc -> number_of_line line + acc) lines 0
+let test_snd_input = "test_input_part_two.txt"
 
 let read_lines file = 
   let contents = In_channel.with_open_bin file In_channel.input_all in
     String.split_on_char '\n' contents
 
-let day1_part1 = sum_of_lines (read_lines input_file_one)
+let digit_of_char c = 
+  match c with
+  | '1'..'9' -> Some (c |> String.make 1 |> int_of_string)
+  | _ -> None
+  
+let digit_filter c = 
+  match c with
+  | '1'..'9' -> true
+  | _ -> false
 
-let spelled_numbers = ["one"; "two"; "three"; "four"; "five"; "six"; "seven"; "eight"; "nine"]
-
-let is_partly_number seq = List.exists (String.starts_with ~prefix:seq) spelled_numbers 
-
-let is_number seq = List.exists (fun x -> String.equal seq x) spelled_numbers
-
-let number_of_seq seq = 
-  let rec find_number lst x =
+let rev_digit_list_of_string s =
+  String.fold_left (fun acc x -> if digit_filter x then (digit_of_char x) :: acc else acc) [] s
+  
+let get_digits lst =
+  let rec get_digits_tr acc lst = 
     match lst with
-    | [] -> raise (Failure "Not Found")
-    | h :: t -> if seq = h then 1 else 1 + find_number t x in find_number spelled_numbers seq
+    | []  -> (-1, -1)
+    | [Some x] -> if (snd acc) = -1 then (x, x) else (x, snd acc) 
+    | Some h :: t -> if (snd acc) = -1 then get_digits_tr (fst acc, h) t else get_digits_tr acc t 
+    | _ ->  (-1, -1) in
+    get_digits_tr (-1, -1) lst
 
-let update_pair pair digit =
-  match pair with
-  | (-1, -1) -> (digit, digit)
-  | (fst, _) -> (fst, digit) 
 
-let number_of_line line =
-  let helper (pair_acc, acc) c =
-    let new_acc = Printf.sprintf "%s%c" acc c in
-       if is_partly_number new_acc then
-        if is_number new_acc then
-          let number = number_of_seq new_acc in 
-            (update_pair pair_acc number, "")
-        else (pair_acc, new_acc)
-       else 
-        let rec partly substr = 
-          let l = String.length substr in 
-          let suffix_str = String.sub substr 1 (l - 1) in
-          if is_partly_number suffix_str 
-            then (pair_acc, suffix_str)
-          else partly suffix_str 
-         in partly new_acc in
+let number_of_pair (st, nd) = let x = st * 10 + nd in x 
 
-  let pair = String.fold_left (fun (pair_acc, acc) c ->
-                                  match c with
-                                  | '0'..'9' -> let digit = int_of_string (String.make 1 c) in 
-                                                  ((update_pair pair_acc digit), "")
-                                  | c -> helper (pair_acc, acc) c
-    ) ((-1, -1), "") line in 
-  match pair with
-  | ((-1, snd), _) -> snd
-  | ((fst, snd), _) -> fst * 10 + snd
+let get_number_and_new_cursor s =
+  let open String in
+  match get s 0 with
+  | '1'..'9' as c -> (digit_of_char c, 1) 
+  | 'o' -> if starts_with ~prefix:"one" s then (Some 1, 2) else (None, 1)
+  | 't' -> if starts_with ~prefix:"two" s then (Some 2, 2) 
+            else if starts_with ~prefix:"three" s then (Some 3, 5) 
+            else (None, 1)
+  | 'f' -> if starts_with ~prefix:"four" s then (Some 4, 4) 
+            else if starts_with ~prefix:"five" s then (Some 5, 3) 
+            else (None, 1)
+  | 's' -> if starts_with ~prefix:"six" s then (Some 6, 3) 
+            else if starts_with ~prefix:"seven" s then (Some 7, 4) 
+            else (None, 1)
+  | 'e' -> if starts_with ~prefix:"eight" s then (Some 8, 4) else (None, 1)
+  | 'n' -> if starts_with ~prefix:"nine" s then (Some 9, 3) else (None, 1)
+  | exception Invalid_argument _ -> (None, 0)
+  | _ -> (None, 1)
 
-  let sum_of_lines lines =
-    List.fold_right ( fun line acc -> number_of_line line + acc) lines 0
+let rev_digits s = 
+  let rec rev_digit_list_of_string' acc s =
+    let l = String.length s in 
+    match get_number_and_new_cursor s with
+    | (None, 0) -> acc
+    | (None, 1) -> rev_digit_list_of_string' acc (String.sub s 1 (l-1))
+    | (None, _) -> []
+    | (Some x, cursor) -> rev_digit_list_of_string' (Some x::acc) (String.sub s cursor (l-cursor)) in
+    rev_digit_list_of_string' [] s
 
-let day_test = sum_of_lines (read_lines test_input)
+let part_one file =
+  file 
+  |> read_lines
+  |> List.map rev_digit_list_of_string
+  |> List.map get_digits
+  |> List.map number_of_pair
+  |> List.fold_left ( + ) 0
 
-let day1_part2 = sum_of_lines (read_lines input_file_two)
+let part_two file =
+  file
+  |> read_lines
+  |> List.map rev_digits
+  |> List.map get_digits
+  |> List.map number_of_pair
+  |> List.fold_left ( + ) 0
 
-let a = List.map number_of_line (read_lines input_file_one)
-let test = List.map number_of_line (read_lines test_input)
+let () =
+  let test_part_one = part_one test_input in
+  Printf.printf "Test part one: %i \n" test_part_one;
+  let part_one = part_one input_file in
+  Printf.printf "Part one: %i \n" part_one;
+  let test_part_two = part_two test_snd_input in
+  Printf.printf "Test part two: %i \n" test_part_two;
+  let part_two = part_two input_file in
+  Printf.printf "Part two: %i \n" part_two;
+
