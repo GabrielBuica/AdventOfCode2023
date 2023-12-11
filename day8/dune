@@ -1,0 +1,3 @@
+(executable
+ (libraries aoc_helpers)
+ (name day8))
